@@ -8,8 +8,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- DataTables CSS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jsPDF untuk Export PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -74,7 +74,8 @@
             padding: 40px;
             border-radius: 10px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            width: 400px;
+            width: 100%;
+            max-width: 400px;
             text-align: center;
         }
         .logo {
@@ -106,7 +107,7 @@
             bottom: -18px;
         }
         .form-group .terbilang {
-            font-size: 14px;
+            font-size: 12px;
             color: #333;
             margin-top: 5px;
             display: block;
@@ -137,8 +138,18 @@
         }
         @media (max-width: 480px) {
             .login-box {
-                width: 90%;
                 padding: 20px;
+                max-width: 90%;
+            }
+            .navbar a {
+                font-size: 14px;
+                margin-left: 10px;
+            }
+        }
+        @media (min-width: 768px) {
+            .login-box {
+                padding: 40px;
+                max-width: 400px;
             }
         }
 
@@ -151,6 +162,7 @@
             display: flex;
             gap: 20px;
             margin-bottom: 30px;
+            flex-wrap: wrap;
         }
         .card {
             flex: 1;
@@ -160,6 +172,7 @@
             border-radius: 10px;
             text-align: center;
             transition: transform 0.2s;
+            min-width: 200px;
         }
         .card:hover {
             transform: translateY(-5px);
@@ -169,13 +182,6 @@
         .card i { font-size: 30px; margin-bottom: 10px; }
         .card h3 { font-size: 18px; margin: 10px 0; }
         .card p { font-size: 24px; font-weight: bold; }
-        .chart-container {
-            background: white;
-            padding: 20-funpx;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
         .table-container {
             background: white;
             padding: 20px;
@@ -186,13 +192,14 @@
             display: flex;
             gap: 10px;
             margin-bottom: 10px;
+            flex-wrap: wrap;
         }
         .table-container select {
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 5px;
         }
-        .print-btn, .export-btn {
+        .print-btn, .export-btn, .export-pdf-btn {
             padding: 10px 20px;
             background: #007BFF;
             color: white;
@@ -201,7 +208,7 @@
             cursor: pointer;
             margin-right: 10px;
         }
-        .print-btn:hover, .export-btn:hover {
+        .print-btn:hover, .export-btn:hover, .export-pdf-btn:hover {
             background: #0056b3;
         }
         table.dataTable {
@@ -216,9 +223,14 @@
         }
         .edit-btn { background: #FFC107; color: white; }
         .delete-btn { background: #DC3545; color: white; }
-        @media (max-width: 768px) {
+        @media (max-width: 480px) {
             .stats { flex-direction: column; }
             .filters { flex-direction: column; }
+            .table-container { padding: 10px; }
+        }
+        @media (min-width: 768px) {
+            .stats { flex-direction: row; }
+            .filters { flex-direction: row; }
         }
 
         .form-container, .settings-container {
@@ -270,7 +282,7 @@
         }
         @media (max-width: 480px) {
             .form-container, .settings-container {
-                width: 90%;
+                max-width: 90%;
                 padding: 20px;
             }
         }
@@ -329,7 +341,8 @@
             padding: 20px;
             border-radius: 10px;
             text-align: center;
-            width: 400px;
+            width: 100%;
+            max-width: 400px;
         }
         .modal-content h3 {
             margin-bottom: 20px;
@@ -348,6 +361,12 @@
         .modal-content .cancel-btn {
             background: #6C757D;
             color: white;
+        }
+        @media (max-width: 480px) {
+            .modal-content {
+                max-width: 90%;
+                padding: 15px;
+            }
         }
     </style>
 </head>
@@ -446,9 +465,6 @@
                 <p id="saldo-keluar-total">Rp 0</p>
             </div>
         </div>
-        <div class="chart-container">
-            <canvas id="transactionChart"></canvas>
-        </div>
         <div class="table-container">
             <div class="filters">
                 <select id="date-filter">
@@ -461,6 +477,7 @@
                 </select>
                 <button class="print-btn" onclick="printTable()">Cetak <i class="fas fa-print"></i></button>
                 <button class="export-btn" onclick="exportToCSV()">Export CSV</button>
+                <button class="export-pdf-btn" onclick="exportToPDF()">Export PDF</button>
             </div>
             <table id="transaction-table" class="display">
                 <thead>
@@ -471,7 +488,6 @@
                         <th>Keterangan</th>
                         <th>Saldo Keluar</th>
                         <th>Keterangan</th>
-                        <th>Total Saldo Keseluruhan</th>
                         <th>ID Pengimput</th>
                         <th>Aksi</th>
                     </tr>
@@ -503,6 +519,10 @@
                 <label for="keterangan-masuk">Keterangan</label>
                 <textarea id="keterangan-masuk" placeholder="Masukkan keterangan"></textarea>
             </div>
+            <div class="form-group">
+                <label>Total Saldo Keseluruhan (Otomatis)</label>
+                <input type="text" id="total-saldo-masuk" disabled>
+            </div>
             <button type="submit" class="save-btn">Simpan</button>
             <button type="button" class="cancel-btn" onclick="clearMasukForm()">Batal</button>
         </form>
@@ -530,6 +550,10 @@
                 <label for="keterangan-keluar">Keterangan</label>
                 <textarea id="keterangan-keluar" placeholder="Masukkan keterangan"></textarea>
             </div>
+            <div class="form-group">
+                <label>Total Saldo Keseluruhan (Otomatis)</label>
+                <input type="text" id="total-saldo-keluar" disabled>
+            </div>
             <button type="submit" class="save-btn">Simpan</button>
             <button type="button" class="cancel-btn" onclick="clearKeluarForm()">Batal</button>
         </form>
@@ -538,8 +562,11 @@
     <!-- Laporan Bulanan -->
     <div class="dashboard-container page" id="laporan-bulanan">
         <h2>Laporan Bulanan</h2>
-        <div class="chart-container">
-            <canvas id="monthlyChart"></canvas>
+        <div class="filters">
+            <select id="year-filter">
+                <option value="">Semua Tahun</option>
+                <option value="2025">2025</option>
+            </select>
         </div>
         <div class="table-container">
             <table id="monthly-table" class="display">
@@ -556,7 +583,24 @@
         </div>
     </div>
 
-    <!-- Pengaturan (Super Admin) -->
+    <!-- Riwayat Aktivitas -->
+    <div class="dashboard-container page" id="riwayat-aktivitas">
+        <h2>Riwayat Aktivitas</h2>
+        <div class="table-container">
+            <table id="activity-table" class="display">
+                <thead>
+                    <tr>
+                        <th>Waktu</th>
+                        <th>Pengguna</th>
+                        <th>Aktivitas</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pengaturan -->
     <div class="settings-container page" id="pengaturan">
         <h2>Pengaturan</h2>
         <form id="settings-form" onsubmit="handleSettingsSubmit(event)">
@@ -569,6 +613,20 @@
                 <input type="email" id="settings-email" placeholder="Masukkan email" required>
             </div>
             <button type="submit" class="update-btn">Perbarui</button>
+        </form>
+        <h2>Ubah Kata Sandi</h2>
+        <form id="change-password-form" onsubmit="handleChangePassword(event)">
+            <div class="form-group">
+                <label for="current-password">Kata Sandi Saat Ini</label>
+                <input type="password" id="current-password" placeholder="Masukkan kata sandi saat ini" required>
+                <span class="error" id="current-password-error"></span>
+            </div>
+            <div class="form-group">
+                <label for="new-password">Kata Sandi Baru</label>
+                <input type="password" id="new-password" placeholder="Masukkan kata sandi baru" required>
+                <span class="error" id="new-password-error"></span>
+            </div>
+            <button type="submit" class="update-btn">Ubah Kata Sandi</button>
         </form>
         <h2>Manajemen Pengguna</h2>
         <form id="add-user-form" onsubmit="handleAddUser(event)">
@@ -631,6 +689,9 @@
         let users = [
             { username: 'super', password: 'super', phone: '08123456789', email: 'super@example.com', role: 'superadmin' }
         ];
+        let activities = [];
+
+        let totalSaldo = 0;
 
         // Inisialisasi DataTables
         let transactionTable = $('#transaction-table').DataTable({
@@ -684,43 +745,19 @@
             }
         });
 
-        // Inisialisasi Chart
-        const ctx = document.getElementById('transactionChart').getContext('2d');
-        const transactionChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [
-                    { label: 'Saldo Masuk', data: [], borderColor: '#28A745', fill: false },
-                    { label: 'Saldo Keluar', data: [], borderColor: '#DC3545', fill: false }
-                ]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { callback: value => 'Rp ' + value.toLocaleString('id-ID') }
-                    }
-                }
-            }
-        });
-
-        const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
-        const monthlyChart = new Chart(monthlyCtx, {
-            type: 'bar',
-            data: {
-                labels: [],
-                datasets: [
-                    { label: 'Saldo Masuk', data: [], backgroundColor: '#28A745' },
-                    { label: 'Saldo Keluar', data: [], backgroundColor: '#DC3545' }
-                ]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { callback: value => 'Rp ' + value.toLocaleString('id-ID') }
-                    }
+        let activityTable = $('#activity-table').DataTable({
+            paging: true,
+            searching: true,
+            ordering: true,
+            language: {
+                search: "Cari:",
+                lengthMenu: "Tampilkan _MENU_ entri",
+                info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ entri",
+                paginate: {
+                    first: "Pertama",
+                    last: "Terakhir",
+                    next: "Berikutnya",
+                    previous: "Sebelumnya"
                 }
             }
         });
@@ -765,6 +802,7 @@
                     <a href="#" onclick="showSection('transaksi-masuk')">Transaksi Masuk</a>
                     <a href="#" onclick="showSection('transaksi-keluar')">Transaksi Keluar</a>
                     <a href="#" onclick="showSection('laporan-bulanan')">Laporan Bulanan</a>
+                    <a href="#" onclick="showSection('riwayat-aktivitas')">Riwayat Aktivitas</a>
                 `;
                 if (user.role === 'superadmin') {
                     links += `<a href="#" onclick="showSection('pengaturan')">Pengaturan</a>`;
@@ -815,6 +853,7 @@
                 }
 
                 localStorage.setItem('user', JSON.stringify(user));
+                logActivity(user.username, 'Login');
                 showNotification('Login berhasil!');
                 loginBtn.removeClass('loading').text('Login');
                 showSection('dashboard');
@@ -868,6 +907,7 @@
 
                 users.push({ username, password, phone, email, role: 'user' });
                 localStorage.setItem('users', JSON.stringify(users));
+                logActivity(username, 'Pendaftaran');
                 showNotification('Pendaftaran berhasil! Silakan login.');
                 registerBtn.removeClass('loading').text('Daftar');
                 showLoginForm();
@@ -899,15 +939,60 @@
             }, 1000);
         }
 
+        // Handle Change Password
+        function handleChangePassword(event) {
+            event.preventDefault();
+            const currentPassword = $('#current-password').val();
+            const newPassword = $('#new-password').val();
+            const currentPasswordError = $('#current-password-error');
+            const newPasswordError = $('#new-password-error');
+            const updateBtn = $('.update-btn', '#change-password-form');
+
+            currentPasswordError.text('');
+            newPasswordError.text('');
+            updateBtn.addClass('loading').text('Memproses...');
+
+            setTimeout(() => {
+                const user = JSON.parse(localStorage.getItem('user'));
+                const userIndex = users.findIndex(u => u.username === user.username);
+                if (users[userIndex].password !== currentPassword) {
+                    currentPasswordError.text('Kata sandi saat ini salah!');
+                    updateBtn.removeClass('loading').text('Ubah Kata Sandi');
+                    showNotification('Gagal mengubah kata sandi!', true);
+                    return;
+                }
+                if (newPassword.length < 6) {
+                    newPasswordError.text('Kata sandi baru minimal 6 karakter!');
+                    updateBtn.removeClass('loading').text('Ubah Kata Sandi');
+                    showNotification('Gagal mengubah kata sandi!', true);
+                    return;
+                }
+
+                users[userIndex].password = newPassword;
+                localStorage.setItem('users', JSON.stringify(users));
+                localStorage.setItem('user', JSON.stringify(users[userIndex]));
+                logActivity(user.username, 'Ubah Kata Sandi');
+                showNotification('Kata sandi berhasil diubah!');
+                updateBtn.removeClass('loading').text('Ubah Kata Sandi');
+                $('#change-password-form')[0].reset();
+            }, 1000);
+        }
+
         // Format Input Rupiah dan Terbilang
         $('#saldo-masuk, #saldo-keluar').on('input', function() {
             let value = $(this).val().replace(/[^0-9]/g, '');
             $(this).val(formatRupiah(value));
-            const terbilangId = this.id === 'saldo-masuk' ? '#terbilang-masuk' : '#terbilang-keluar';
+            const terbilangId = $(this).attr('id') === 'saldo-masuk' ? '#terbilang-masuk' : '#terbilang-keluar';
             $(terbilangId).text(value ? terbilang(parseInt(value)) : '');
         });
 
         // Handle Transaksi Masuk
+        $('#saldo-masuk').on('input', function() {
+            const saldoMasuk = parseFloat($(this).val().replace(/[^0-9]/g, '') || 0);
+            const newTotalSaldo = totalSaldo + saldoMasuk;
+            $('#total-saldo-masuk').val(formatRupiah(newTotalSaldo));
+        });
+
         function handleTransaksiMasukSubmit(event) {
             event.preventDefault();
             const saldoMasuk = $('#saldo-masuk').val().replace(/[^0-9]/g, '');
@@ -925,12 +1010,13 @@
         }
 
         function saveTransaksiMasuk(isEdit = false) {
-            const user = JSON.parse(localStorage.getItem('user'));
             const id = $('#id-transaksi-masuk').val();
             const tanggal = $('#tanggal-masuk').val();
             const saldoMasuk = parseFloat($('#saldo-masuk').val().replace(/[^0-9]/g, '') || 0);
             const keteranganMasuk = $('#keterangan-masuk').val();
-            const totalSaldo = transactions.reduce((sum, t) => sum + t.saldo_masuk - t.saldo_keluar, 0) + saldoMasuk;
+            const user = JSON.parse(localStorage.getItem('user'));
+            const pengimput = user.username;
+            totalSaldo += saldoMasuk;
 
             const transaction = {
                 id,
@@ -939,19 +1025,22 @@
                 keterangan_masuk: keteranganMasuk,
                 saldo_keluar: 0,
                 keterangan_keluar: '',
-                total_saldo: totalSaldo,
-                pengimput: user.username
+                pengimput
             };
 
             if (isEdit) {
                 const index = transactions.findIndex(t => t.id === id);
+                totalSaldo -= transactions[index].saldo_masuk;
+                totalSaldo += saldoMasuk;
                 transactions[index] = transaction;
             } else {
                 transactions.push(transaction);
             }
 
             updateTransactionData(transaction, isEdit);
+            logActivity(pengimput, isEdit ? 'Edit Transaksi Masuk' : 'Tambah Transaksi Masuk');
             showNotification(`Transaksi masuk ${isEdit ? 'diperbarui' : 'disimpan'} berhasil!`);
+            requestPushNotification(`Transaksi masuk baru oleh ${pengimput}`);
             clearMasukForm();
             showSection('dashboard');
         }
@@ -961,10 +1050,17 @@
             $('#form-masuk-title').text('Tambah Transaksi Masuk');
             $('#id-transaksi-masuk').val('TRX-' + String(transactions.length + 1).padStart(6, '0'));
             $('#tanggal-masuk').val('2025-05-09');
+            $('#total-saldo-masuk').val('');
             $('#saldo-masuk-error, #terbilang-masuk').text('');
         }
 
         // Handle Transaksi Keluar
+        $('#saldo-keluar').on('input', function() {
+            const saldoKeluar = parseFloat($(this).val().replace(/[^0-9]/g, '') || 0);
+            const newTotalSaldo = totalSaldo - saldoKeluar;
+            $('#total-saldo-keluar').val(formatRupiah(newTotalSaldo));
+        });
+
         function handleTransaksiKeluarSubmit(event) {
             event.preventDefault();
             const saldoKeluar = $('#saldo-keluar').val().replace(/[^0-9]/g, '');
@@ -982,12 +1078,13 @@
         }
 
         function saveTransaksiKeluar(isEdit = false) {
-            const user = JSON.parse(localStorage.getItem('user'));
             const id = $('#id-transaksi-keluar').val();
             const tanggal = $('#tanggal-keluar').val();
             const saldoKeluar = parseFloat($('#saldo-keluar').val().replace(/[^0-9]/g, '') || 0);
             const keteranganKeluar = $('#keterangan-keluar').val();
-            const totalSaldo = transactions.reduce((sum, t) => sum + t.saldo_masuk - t.saldo_keluar, 0) - saldoKeluar;
+            const user = JSON.parse(localStorage.getItem('user'));
+            const pengimput = user.username;
+            totalSaldo -= saldoKeluar;
 
             const transaction = {
                 id,
@@ -996,19 +1093,22 @@
                 keterangan_masuk: '',
                 saldo_keluar: saldoKeluar,
                 keterangan_keluar: keteranganKeluar,
-                total_saldo: totalSaldo,
-                pengimput: user.username
+                pengimput
             };
 
             if (isEdit) {
                 const index = transactions.findIndex(t => t.id === id);
+                totalSaldo += transactions[index].saldo_keluar;
+                totalSaldo -= saldoKeluar;
                 transactions[index] = transaction;
             } else {
                 transactions.push(transaction);
             }
 
             updateTransactionData(transaction, isEdit);
+            logActivity(pengimput, isEdit ? 'Edit Transaksi Keluar' : 'Tambah Transaksi Keluar');
             showNotification(`Transaksi keluar ${isEdit ? 'diperbarui' : 'disimpan'} berhasil!`);
+            requestPushNotification(`Transaksi keluar baru oleh ${pengimput}`);
             clearKeluarForm();
             showSection('dashboard');
         }
@@ -1018,12 +1118,12 @@
             $('#form-keluar-title').text('Tambah Transaksi Keluar');
             $('#id-transaksi-keluar').val('TRX-' + String(transactions.length + 1).padStart(6, '0'));
             $('#tanggal-keluar').val('2025-05-09');
+            $('#total-saldo-keluar').val('');
             $('#saldo-keluar-error, #terbilang-keluar').text('');
         }
 
         // Update Transaction Data
         function updateTransactionData(transaction, isEdit) {
-            const totalSaldo = transactions.reduce((sum, t) => sum + t.saldo_masuk - t.saldo_keluar, 0);
             $('#total-saldo').text(formatRupiah(totalSaldo));
             $('#saldo-masuk-total').text(formatRupiah(transactions.reduce((sum, t) => sum + t.saldo_masuk, 0)));
             $('#saldo-keluar-total').text(formatRupiah(transactions.reduce((sum, t) => sum + t.saldo_keluar, 0)));
@@ -1036,23 +1136,14 @@
                 t.keterangan_masuk || '-',
                 t.saldo_keluar ? formatRupiah(t.saldo_keluar) : '-',
                 t.keterangan_keluar || '-',
-                formatRupiah(t.total_saldo),
                 t.pengimput,
                 `<button class="action-btn edit-btn" onclick="editTransaction(this)">Edit</button>
                  <button class="action-btn delete-btn" onclick="deleteTransaction(this)">Hapus</button>`
             ]));
             transactionTable.draw();
 
-            transactionChart.data.labels = transactions.map(t => t.tanggal);
-            transactionChart.data.datasets[0].data = transactions.map(t => t.saldo_masuk);
-            transactionChart.data.datasets[1].data = transactions.map(t => t.saldo_keluar);
-            transactionChart.update();
-
-            // Update Filter Tanggal
-            const dates = [...new Set(transactions.map(t => t.tanggal))];
-            $('#date-filter').html('<option value="">Semua Tanggal</option>' + dates.map(d => `<option value="${d}">${d}</option>`).join(''));
-
             updateMonthlyReport();
+            updateDateFilter();
         }
 
         // Edit Transaction
@@ -1073,6 +1164,7 @@
                 $('#tanggal-masuk').val(transaction.tanggal);
                 $('#saldo-masuk').val(formatRupiah(transaction.saldo_masuk));
                 $('#keterangan-masuk').val(transaction.keterangan_masuk);
+                $('#total-saldo-masuk').val(formatRupiah(totalSaldo));
                 $('#terbilang-masuk').text(terbilang(transaction.saldo_masuk));
                 showSection('transaksi-masuk');
             } else {
@@ -1081,6 +1173,7 @@
                 $('#tanggal-keluar').val(transaction.tanggal);
                 $('#saldo-keluar').val(formatRupiah(transaction.saldo_keluar));
                 $('#keterangan-keluar').val(transaction.keterangan_keluar);
+                $('#total-saldo-keluar').val(formatRupiah(totalSaldo));
                 $('#terbilang-keluar').text(terbilang(transaction.saldo_keluar));
                 showSection('transaksi-keluar');
             }
@@ -1096,10 +1189,14 @@
 
             const row = $(button).closest('tr');
             const id = row.find('td').eq(0).text();
+            const transaction = transactions.find(t => t.id === id);
 
             showModal('delete-transaction', () => {
                 transactions = transactions.filter(t => t.id !== id);
-                updateTransactionData({}, false);
+                totalSaldo -= transaction.saldo_masuk;
+                totalSaldo += transaction.saldo_keluar;
+                updateTransactionData({ saldo_masuk: 0, saldo_keluar: 0 }, false);
+                logActivity(user.username, 'Hapus Transaksi');
                 showNotification('Transaksi dihapus!');
             });
         }
@@ -1110,30 +1207,26 @@
             transactions.forEach(t => {
                 const month = t.tanggal.slice(0, 7);
                 if (!monthlyData[month]) {
-                    monthlyData[month] = { masuk: 0, keluar: 0, total: 0 };
+                    monthlyData[month] = { masuk: 0, keluar: 0 };
                 }
                 monthlyData[month].masuk += t.saldo_masuk;
                 monthlyData[month].keluar += t.saldo_keluar;
-                monthlyData[month].total = transactions.filter(tr => tr.tanggal.startsWith(month)).reduce((sum, tr) => sum + tr.saldo_masuk - tr.saldo_keluar, 0);
             });
 
-            const labels = Object.keys(monthlyData);
-            const masukData = labels.map(m => monthlyData[m].masuk);
-            const keluarData = labels.map(m => monthlyData[m].keluar);
-
-            monthlyChart.data.labels = labels;
-            monthlyChart.data.datasets[0].data = masukData;
-            monthlyChart.data.datasets[1].data = keluarData;
-            monthlyChart.update();
-
             monthlyTable.clear();
-            monthlyTable.rows.add(labels.map(m => [
+            monthlyTable.rows.add(Object.keys(monthlyData).map(m => [
                 m,
                 formatRupiah(monthlyData[m].masuk),
                 formatRupiah(monthlyData[m].keluar),
-                formatRupiah(monthlyData[m].total)
+                formatRupiah(monthlyData[m].masuk - monthlyData[m].keluar)
             ]));
             monthlyTable.draw();
+        }
+
+        // Update Date Filter
+        function updateDateFilter() {
+            const dates = [...new Set(transactions.map(t => t.tanggal))];
+            $('#date-filter').html('<option value="">Semua Tanggal</option>' + dates.map(d => `<option value="${d}">${d}</option>`).join(''));
         }
 
         // Handle Settings
@@ -1141,7 +1234,7 @@
             event.preventDefault();
             const phone = $('#settings-phone').val();
             const email = $('#settings-email').val();
-            const updateBtn = $('.update-btn');
+            const updateBtn = $('.update-btn', '#settings-form');
 
             updateBtn.addClass('loading').text('Memproses...');
 
@@ -1152,6 +1245,7 @@
                 users[userIndex].email = email;
                 localStorage.setItem('users', JSON.stringify(users));
                 localStorage.setItem('user', JSON.stringify(users[userIndex]));
+                logActivity(user.username, 'Perbarui Pengaturan');
                 showNotification('Pengaturan diperbarui!');
                 updateBtn.removeClass('loading').text('Perbarui');
             }, 1000);
@@ -1178,6 +1272,7 @@
                 users.push({ username, password, phone, email, role: 'user' });
                 localStorage.setItem('users', JSON.stringify(users));
                 updateUserTable();
+                logActivity(username, 'Tambah Pengguna');
                 showNotification('Pengguna ditambahkan!');
                 saveBtn.removeClass('loading').text('Tambah Pengguna');
                 $('#add-user-form')[0].reset();
@@ -1202,26 +1297,51 @@
                 users = users.filter(u => u.username !== username);
                 localStorage.setItem('users', JSON.stringify(users));
                 updateUserTable();
+                logActivity(JSON.parse(localStorage.getItem('user')).username, 'Hapus Pengguna');
                 showNotification('Pengguna dihapus!');
             });
         }
 
+        // Log Activity
+        function logActivity(username, activity) {
+            const waktu = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            activities.push({ waktu, username, activity });
+            localStorage.setItem('activities', JSON.stringify(activities));
+            activityTable.clear();
+            activityTable.rows.add(activities.map(a => [a.waktu, a.username, a.activity]));
+            activityTable.draw();
+        }
+
         // Cetak Tabel
         function printTable() {
-            const divToPrint = document.getElementById('transaction-table');
-            const newWin = window.open('');
-            newWin.document.write('<html><head><title>Cetak Transaksi</title>');
-            newWin.document.write('<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">');
-            newWin.document.write('</head><body>' + divToPrint.outerHTML + '</body></html>');
-            newWin.print();
-            newWin.close();
+            const tableHtml = document.getElementById('transaction-table').outerHTML;
+            const printWin = window.open('', '_blank');
+            printWin.document.write(`
+                <html>
+                    <head>
+                        <title>Cetak Transaksi</title>
+                        <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+                        <style>
+                            body { font-family: Arial, sans-serif; }
+                            table { width: 100%; border-collapse: collapse; }
+                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                            th { background-color: #f2f2f2; }
+                        </style>
+                    </head>
+                    <body>${tableHtml}</body>
+                </html>
+            `);
+            printWin.document.close();
+            printWin.focus();
+            printWin.print();
+            printWin.close();
         }
 
         // Export CSV
         function exportToCSV() {
-            let csv = 'ID Transaksi,Tanggal,Saldo Masuk,Keterangan Masuk,Saldo Keluar,Keterangan Keluar,Total Saldo Keseluruhan,ID Pengimput\n';
+            let csv = 'ID Transaksi,Tanggal,Saldo Masuk,Keterangan Masuk,Saldo Keluar,Keterangan Keluar,ID Pengimput\n';
             transactions.forEach(t => {
-                csv += `${t.id},${t.tanggal},${t.saldo_masuk || '-'},${t.keterangan_masuk || '-'},${t.saldo_keluar || '-'},${t.keterangan_keluar || '-'},${t.total_saldo},${t.pengimput}\n`;
+                csv += `${t.id},${t.tanggal},${t.saldo_masuk || '-'},${t.keterangan_masuk || '-'},${t.saldo_keluar || '-'},${t.keterangan_keluar || '-'},${t.pengimput}\n`;
             });
 
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1229,6 +1349,19 @@
             link.href = URL.createObjectURL(blob);
             link.download = 'transaksi.csv';
             link.click();
+        }
+
+        // Export PDF
+        function exportToPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text('Laporan Transaksi', 10, 10);
+            let y = 20;
+            transactions.forEach(t => {
+                doc.text(`ID: ${t.id}, Tanggal: ${t.tanggal}, Masuk: ${t.saldo_masuk ? formatRupiah(t.saldo_masuk) : '-'}, Keluar: ${t.saldo_keluar ? formatRupiah(t.saldo_keluar) : '-'}, Pengimput: ${t.pengimput}`, 10, y);
+                y += 10;
+            });
+            doc.save('transaksi.pdf');
         }
 
         // Filter Tabel
@@ -1252,13 +1385,50 @@
                 t.keterangan_masuk || '-',
                 t.saldo_keluar ? formatRupiah(t.saldo_keluar) : '-',
                 t.keterangan_keluar || '-',
-                formatRupiah(t.total_saldo),
                 t.pengimput,
                 `<button class="action-btn edit-btn" onclick="editTransaction(this)">Edit</button>
                  <button class="action-btn delete-btn" onclick="deleteTransaction(this)">Hapus</button>`
             ]));
             transactionTable.draw();
         });
+
+        // Filter Tahunan
+        $('#year-filter').on('change', function() {
+            const yearFilter = $('#year-filter').val();
+            const monthlyData = {};
+            transactions.forEach(t => {
+                const month = t.tanggal.slice(0, 7);
+                if (!yearFilter || t.tanggal.startsWith(yearFilter)) {
+                    if (!monthlyData[month]) {
+                        monthlyData[month] = { masuk: 0, keluar: 0 };
+                    }
+                    monthlyData[month].masuk += t.saldo_masuk;
+                    monthlyData[month].keluar += t.saldo_keluar;
+                }
+            });
+
+            monthlyTable.clear();
+            monthlyTable.rows.add(Object.keys(monthlyData).map(m => [
+                m,
+                formatRupiah(monthlyData[m].masuk),
+                formatRupiah(monthlyData[m].keluar),
+                formatRupiah(monthlyData[m].masuk - monthlyData[m].keluar)
+            ]));
+            monthlyTable.draw();
+        });
+
+        // Simulasi Push Notification
+        function requestPushNotification(message) {
+            if (Notification.permission === 'granted') {
+                new Notification(message);
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification(message);
+                    }
+                });
+            }
+        }
 
         // Modal
         function showModal(action, callback) {
@@ -1267,6 +1437,8 @@
                 $('#modal-title').text('Konfirmasi Logout');
                 $('#modal-message').text('Apakah Anda yakin ingin logout?');
                 $('#modal-confirm').off('click').on('click', () => {
+                    const user = JSON.parse(localStorage.getItem('user'));
+                    logActivity(user.username, 'Logout');
                     localStorage.removeItem('user');
                     showSection('login');
                     closeModal();
@@ -1322,8 +1494,14 @@
         // Inisialisasi
         const storedUsers = localStorage.getItem('users');
         if (storedUsers) users = JSON.parse(storedUsers);
+        const storedActivities = localStorage.getItem('activities');
+        if (storedActivities) activities = JSON.parse(storedActivities);
         updateUserTable();
         updateMonthlyReport();
+        updateDateFilter();
+        activityTable.clear();
+        activityTable.rows.add(activities.map(a => [a.waktu, a.username, a.activity]));
+        activityTable.draw();
 
         const user = JSON.parse(localStorage.getItem('user'));
         showSection(user ? 'dashboard' : 'login');
@@ -1335,4 +1513,4 @@
         }
     </script>
 </body>
-</html>
+    </html>
